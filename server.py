@@ -1,82 +1,52 @@
-#!/usr/bin/env python3
+import socket
+import threading 
+from Constants import *
 import time
-import mpv
-from os import listdir
-from os.path import exists
-import pymkv
+import os
 
-DIR="videos"
+server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+server.bind((HOST,PORT))
 
-def swap(value):
-    if(value == False):
-        return True
-    return False
+connection_list = []
 
 
-player = mpv.MPV(fs=False)
-player.window_maximized=True
-while True:
-    fn = input("Enter filename (q to quit): ")
-    if (fn == 'q'):
-        exit()
-    print(fn)
-    if (not (exists(f"./{DIR}/{fn}"))):
-        print("File not found")
-        continue
-    fileType=fn.split(".")[-1]
-    if ( fileType not in {'mp4', 'mkv', 'mp3'}):
-        print("Invalid type")
-        continue
-    break
+def handle_client(conn,address,connection_list):
+    connected= True
 
-if (fileType == "mkv"):
-    pass
+    while (connected):
+        message = conn.recv(MAX_SIZE)
+        message_decoded = message.decode(FORMAT)
 
-player.play(f'./{DIR}/{fn}')
-player.wait_until_playing()
+        if message_decoded == DC or message_decoded == '':
+            connection_list.remove(conn)
+            connected=False
+            break
 
-audioTrack=1
-VideoTrack=1
+        if message_decoded == SD:
+            for i in connection_list:
+                conn.send(SD.encode(FORMAT))
 
-if (fileType=="mkv"):
-    player.pause=True
-    print("\nAudio Tracks:")
+            for i in connection_list:
+                i.close()
 
-    for i in player.track_list:
-        if (i['type'] == 'audio'):
-            if ('title' in i.keys()):
-                print(f"{i['id']}. {i['title']} ({i['lang']})")
-            else:
-                print(f"{i['id']}. ({i['lang']})")
+            print("Done")
+            os._exit(1)
+        
 
-    audioTrack = int(input("\nSelect audio track: "))
+        for i in connection_list:
+            i.send(message)
     
-    print("\nSub Tracks:")
-    for i in player.track_list:
-        if (i['type'] == 'sub'):
-            if ('title' in i.keys()):
-                print(f"{i['id']}. {i['title']} ({i['lang']})")
-            else:
-                print(f"{i['id']}. ({i['lang']})")
-
-    subTrack = int(input("\nSelect sub track: "))
-    player.aid=audioTrack
-    player.sid=subTrack
-    print("Hit play")
-
-@player.on_key_press('f')
-def my_q_binding():
-    player.fs = swap(player.fs)
-
-@player.on_key_press('space')
-def my_q_binding():
-    player.pause = swap(player.pause)
- 
+    conn.close()
 
 
-player.show_text("hello", 1000)
-while not player._core_shutdown:
-   
-    continue
+while True:
+    server.listen()
+    conn, address = server.accept()
+    if conn in connection_list:
+        continue
+    connection_list.append(conn)
+    print(f"{conn}, {address} is connected")
+    thread = threading.Thread(target=handle_client, args=(conn,address,connection_list))
+    thread.start()
 
 
