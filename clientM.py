@@ -1,125 +1,146 @@
 #!/usr/bin/env python3
 import time
 import mpv
-from os import listdir
-from os.path import exists
+import os
 import pymkv
 
 import socket
 import threading 
 
 from Constants import *
+from helper import *
+from local_server import *
 
-DIR="videos"
-MAX_SIZE = 512
-
-def swap(value):
-    if(value == False):
-        return True
-    return False
-
-def sendMessage(message,socket):
-    socket.send((message+" "*(MAX_SIZE - len(message))).encode(FORMAT))
 
 class Player():
-    video_player= mpv.MPV(fs=False)
+    media_player= mpv.MPV(fs=False, keep_open=True)
     fn = ""
-    video_player.window_maximized = True
+    media_player.window_maximized = True
+    aid = 1
+    sid = 1
     DIR="videos"
+
     def play(self):
-        self.video_player.play(f'./{self.DIR}/{self.fn}')
+        self.media_player.play(f'./{self.DIR}/{self.fn}')
 
+    def wait(self):
+        self.media_player.wait_until_playing()
+
+    def set_aid(self, value):
+        self.aid = value
+        self.media_player.aid = self.aid
+    
+    def set_sid(self, value):
+        self.sid = value
+        self.media_player.sid = self.sid
+
+    def get_media(self):
+        return self.media_player
+    
+    
 player = Player()
-
-while True:
-    fn = input("Enter filename (q to quit): ")
-    if (fn == 'q'):
-        exit()
-    if (not (exists(f"./{DIR}/{fn}"))):
-        print("File not found")
-        continue
-    fileType=fn.split(".")[-1]
-    if ( fileType not in {'mp4', 'mkv', 'mp3'}):
-        print("Invalid type")
-        continue
-    break
 
 socket = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
 socket.connect((HOST,PORT))
 
+print("Socket 1:" + str(socket))
+
 def handleMessage(player):
     while True:
         y = (socket.recv(MAX_SIZE)).decode(FORMAT)
+        
         m=y.split("#")[0]
         c=m.split(",")[0]
         a=m.split(",")[1]
+        
         if (c == "sfn"):
             player.fn = a
+
         if (c == "pw"):
             player.play()
-            player.video_player.wait_until_playing()
+            player.get_media().wait_until_playing
+            player.get_media().pause=True
 
-t = threading.Thread(target=handleMessage,args=(player,) )
-t.start()
-
-sendMessage("sfn,"+fn+"#", socket)
-sendMessage("pw,"+"#", socket)
-
-'''
-player.play(f'./{DIR}/{fn}')
-player.wait_until_playing()
-'''
-
-audioTrack=1
-VideoTrack=1
-
-
-
-
-'''
-if (fileType=="mkv"):
-    player.pause=True
-    print("\nAudio Tracks:")
-
-    for i in player.track_list:
-        if (i['type'] == 'audio'):
-            if ('title' in i.keys()):
-                print(f"{i['id']}. {i['title']} ({i['lang']})")
+        if (c == "aid"):
+            player.set_aid(int(a))
+        if (c == "sid"):
+            player.set_sid(int(a))
+        
+        if (c == "p"):
+            if (a == "0"):
+                player.get_media().pause = False
             else:
-                print(f"{i['id']}. ({i['lang']})")
-
-    audioTrack = int(input("\nSelect audio track: "))
-    
-    print("\nSub Tracks:")
-    for i in player.track_list:
-        if (i['type'] == 'sub'):
-            if ('title' in i.keys()):
-                print(f"{i['id']}. {i['title']} ({i['lang']})")
+                player.get_media().pause = True
+        
+        if (c == "p"):
+            if (a == "0"):
+                player.get_media().pause = False
             else:
-                print(f"{i['id']}. ({i['lang']})")
+                player.get_media().pause = True
+        
+        if (c == "r"):
+            player.get_media().seek(int(a))
 
-    subTrack = int(input("\nSelect sub track: "))
-    
-    player.aid=audioTrack
-    player.sid=subTrack
-    
-    print("Hit play")
-else:
+        if (c == "l"):
+            player.get_media().seek(-1 * int(a))
 
+        if (c == "g"):
+            print(a)
+            player.get_media().seek(int(a),  reference="absolute" , precision="exact")
 
-@player.on_key_press('f')
+input_thread = threading.Thread(target=handleMessage,args=(player,) )
+input_thread.daemon = True
+input_thread.start()
+
+play_file(player, socket)
+
+@player.get_media().on_key_press('f')
+def my_f_binding():
+    player.get_media().fs = swap(player.get_media().fs)
+
+@player.get_media().on_key_press('q')
 def my_q_binding():
+    player.get_media().quit(0)
 
-    player.fs = swap(player.fs)
+def show_time(media):
+    for i in range(5):
+        media.show_text(f"{format_time(media.time_pos)}/{format_time(media.duration)}")
+        time.sleep(0.5)
 
-@player.on_key_press('space')
-def my_q_binding():
+@player.get_media().on_key_press('t')
+def my_t_binding():
+    for i in threading.enumerate():
+        if (i._target == show_time):
+            return
 
-    player.pause = swap(player.pause)
- 
+    time_show = threading.Thread(target=show_time, args=(player.get_media(),))
+    time_show.daemon = True
+    time_show.start()
 
-while not player._core_shutdown:
-   
-    continue
-'''
+@player.get_media().on_key_press('space')
+def my_space_binding():
+    sendCommand("p", str(int(swap(player.get_media().pause))),socket)
 
+@player.get_media().on_key_press('n')
+def my_n_binding():
+    play_file(player, socket)
+
+@player.get_media().on_key_press('RIGHT')
+def my_RIGHT_binding():
+    sendCommand("r", str(SEEK_VALUE) ,socket)
+
+@player.get_media().on_key_press('LEFT')
+def my_LEFT_binding():
+    sendCommand("l", str(SEEK_VALUE) ,socket)
+
+@player.get_media().on_key_press('g')
+def my_g_binding():
+    x = get_time("Enter position (-1 to quit):")
+    if (x < 0 ):
+        return
+    sendCommand("g", str(x) ,socket)
+
+player.media_player.wait_for_shutdown()
+
+print('Quitting')
+os._exit(0)
