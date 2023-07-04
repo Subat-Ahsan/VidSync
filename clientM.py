@@ -9,7 +9,6 @@ import threading
 
 from Constants import *
 from helper import *
-from local_server import *
 
 
 class Player():
@@ -19,6 +18,7 @@ class Player():
     aid = 1
     sid = 1
     DIR="videos"
+    duration = 0
 
     def play(self):
         self.media_player.play(f'./{self.DIR}/{self.fn}')
@@ -37,18 +37,62 @@ class Player():
     def get_media(self):
         return self.media_player
     
+    def get_duration(self):
+        return self.duration
     
+    def get_current_information(self):
+        if self.fn == "":
+            return "NONE"
+        return f"{self.fn},{self.media_player.time_pos},{self.duration},{self.aid},{self.sid},{int(self.media_player.pause)},{time.time()}"
+
+    def set_from_information(self,info):
+        info_lis = info.split(",")
+        if info_lis[0] == "":
+            return
+        fn = info_lis[0]
+
+        #start_time = time.time()
+
+        #adj_factor = time.time() - float(info_lis[6])
+        #print(adj_factor)
+        time_pos = float(info_lis[1])
+        duration = float(info_lis[2])
+        aid = int(info_lis[3])
+        sid = int(info_lis[4])
+        pause = bool(int(info_lis[5]))
+
+        
+        self.fn = fn
+        self.play()
+        self.media_player.wait_until_playing()
+
+        #end_time = time.time()
+
+        self.media_player.time_pos = time_pos 
+        self.media_player.pause = pause
+        self.duration = duration
+        
+        self.set_aid(aid)
+        self.set_sid(sid)
+
+        print(fn,time_pos,duration,aid,sid,pause)
+
 player = Player()
 
 socket = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
 socket.connect((HOST,PORT))
+info = socket.recv(MAX_SIZE).decode(FORMAT)
 
+print(info)
 print("Socket 1:" + str(socket))
 
 def handleMessage(player):
     while True:
-        y = (socket.recv(MAX_SIZE)).decode(FORMAT)
-        
+        try:
+            y = (socket.recv(MAX_SIZE)).decode(FORMAT)
+        except ConnectionResetError:
+            exit()
+
         m=y.split("#")[0]
         c=m.split(",")[0]
         a=m.split(",")[1]
@@ -58,19 +102,14 @@ def handleMessage(player):
 
         if (c == "pw"):
             player.play()
-            player.get_media().wait_until_playing
+            player.get_media().wait_until_playing()
+            player.duration = player.get_media().duration
             player.get_media().pause=True
 
         if (c == "aid"):
             player.set_aid(int(a))
         if (c == "sid"):
             player.set_sid(int(a))
-        
-        if (c == "p"):
-            if (a == "0"):
-                player.get_media().pause = False
-            else:
-                player.get_media().pause = True
         
         if (c == "p"):
             if (a == "0"):
@@ -88,11 +127,22 @@ def handleMessage(player):
             print(a)
             player.get_media().seek(int(a),  reference="absolute" , precision="exact")
 
+        if (c == "i"):
+            sendMessage(player.get_current_information()+"#",socket)
+
 input_thread = threading.Thread(target=handleMessage,args=(player,) )
 input_thread.daemon = True
 input_thread.start()
 
-play_file(player, socket)
+info_split= info.split("#")[0]
+if info_split == "NONE":
+    i = input("Would you like to play file (y): ")
+    if (i == 'y'):
+        play_file(player, socket)
+    else: 
+        player.get_media().wait_until_playing()
+else:
+    player.set_from_information(info_split)
 
 @player.get_media().on_key_press('f')
 def my_f_binding():
@@ -102,9 +152,9 @@ def my_f_binding():
 def my_q_binding():
     player.get_media().quit(0)
 
-def show_time(media):
+def show_time(player, media):
     for i in range(5):
-        media.show_text(f"{format_time(media.time_pos)}/{format_time(media.duration)}")
+        media.show_text(f"{format_time(media.time_pos)}/{format_time(player.get_duration())}")
         time.sleep(0.5)
 
 @player.get_media().on_key_press('t')
@@ -113,7 +163,7 @@ def my_t_binding():
         if (i._target == show_time):
             return
 
-    time_show = threading.Thread(target=show_time, args=(player.get_media(),))
+    time_show = threading.Thread(target=show_time, args=(player, player.get_media()))
     time_show.daemon = True
     time_show.start()
 
@@ -143,4 +193,4 @@ def my_g_binding():
 player.media_player.wait_for_shutdown()
 
 print('Quitting')
-os._exit(0)
+sendMessage(DC+"#", socket)

@@ -2,7 +2,7 @@ from Constants import *
 from local_server import *
 import time
 import os
-def checkInt(i):
+def check_int(i):
     try:
         x = int(i)
     except ValueError:
@@ -33,7 +33,7 @@ def get_time(message):
     l = i.split(":")
 
     for t in reversed(l):
-        if not checkInt(t):
+        if not check_int(t):
             return -1
 
         t = int(t)
@@ -51,16 +51,27 @@ def swap(value):
     return False
 
 def sendMessage(message,socket):
-    socket.send((message+" "*(MAX_SIZE - len(message))).encode(FORMAT))
+    try:
+        socket.send((message+" "*(MAX_SIZE - len(message))).encode(FORMAT))
+    except ConnectionResetError:
+        print("Connection Reset Error")
+        return
 
 def sendCommand(command,argument,socket):
     s = command+","+argument+"#"
     sendMessage(s,socket)
 
+def get_track(message):
+    x = input(message)
+    if not check_int(x):
+        return '1'
+    return x
+
 def play_file(player, socket):
     while True:
         fn = input("Enter filename (q to quit): ")
         if (fn == 'q'):
+            sendMessage(DC+"#",socket)
             exit()
         if (not (os.path.exists(f"./{DIR}/{fn}"))):
             print("File not found")
@@ -73,11 +84,11 @@ def play_file(player, socket):
 
     sendCommand("sfn",fn,socket)
     sendCommand("pw","0",socket)
-
     
     audioTrack=1
     VideoTrack=1
 
+    count = 0
     if (fileType=="mkv"):
         time.sleep(0.5)
         print("\nAudio Tracks:")
@@ -88,9 +99,11 @@ def play_file(player, socket):
                     print(f"{i['id']}. {i['title']} ({i['lang']})")
                 else:
                     print(f"{i['id']}. ({i['lang']})")
+            count += 1
 
-        audioTrack = (input("\nSelect audio track: "))
+        audioTrack = get_track("Enter audio track: ")
         
+        count = 0
         print("\nSub Tracks:")
         for i in player.get_media().track_list:
             if (i['type'] == 'sub'):
@@ -98,8 +111,8 @@ def play_file(player, socket):
                     print(f"{i['id']}. {i['title']} ({i['lang']})")
                 else:
                     print(f"{i['id']}. ({i['lang']})")
-
-        subTrack = (input("\nSelect sub track: "))
+            count += 1
+        subTrack = get_track("Enter subtitle track: ")
         
         sendCommand("aid",audioTrack,socket)
         sendCommand("sid",subTrack,socket)
