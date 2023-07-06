@@ -1,4 +1,4 @@
-MAX_SIZE = 1024
+MAX_SIZE = 512
 FORMAT = 'utf-8'
 DC = "!X"
 SD = "!Y"

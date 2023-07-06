@@ -11,7 +11,9 @@ server.bind((HOST,PORT))
 
 server_data = {
     "connection_list" : [],
-    "main_conn" : None
+    "main_conn" : None,
+    "new_conn" : None,
+    "waiting" : False
 }
 
 def disconnect(message, server_data, conn):
@@ -23,19 +25,24 @@ def disconnect(message, server_data, conn):
             return
         server_data['main_conn'] = server_data["connection_list"][0]
     
-def get_current_information(server_data):
+def get_current_information(server_data, conn):
     if server_data['main_conn'] == None:
-        return "NONE#"
+        sendMessage("NONE#", conn)
+        return
 
-    sendCommand("i",'0',server_data['main_conn'])
-    try:
-        info = server_data['main_conn'].recv(MAX_SIZE).decode(FORMAT)
-        
-    except:
-        return "NONE#"
+    for c in server_data["connection_list"]:
+        if c == conn:
+            continue
+        sendCommand("n","0",c)
+        server_data['waiting'] = True
+        server_data['new_conn'] = conn
+    sendMessage("i#",server_data['main_conn'])
 
-    return info
-
+def stop_waiting_for_new_conn(server_data):
+    for i in server_data["connection_list"]:
+        sendMessage("c,0#",i)
+    server_data["new_conn"] = None
+    server_data["waiting"] = False
 
 def handle_client(conn,address,server_data):
     connected= True
@@ -54,8 +61,8 @@ def handle_client(conn,address,server_data):
             break
 
         message_decoded = message.decode(FORMAT)
-        
         message_split = message_decoded.split("#")[0]
+        print(f"From: {conn} : {message_split}|")
 
         if message_split == DC:
             disconnect("Disconnecting (q)",server_data,conn)
@@ -71,6 +78,23 @@ def handle_client(conn,address,server_data):
 
             print("Done")
             os._exit(1)
+
+        if message_split[0] == '>':
+            
+            sendMessage(message_split[1:],server_data["new_conn"])
+            try:
+                m = server_data["new_conn"].recv(MAX_SIZE)
+            except:
+                stop_waiting_for_new_conn(server_data)
+                disconnect("Disconnecting (n)", server_data, server_data["new_conn"])
+                continue
+            print(m)
+            stop_waiting_for_new_conn(server_data)
+            
+            if message == '':
+                disconnect("Disconnecting (n)", server_data, server_data["new_conn"])
+            continue
+        
 
         if message_split == "pw,0":
             server_data["main_conn"] = conn
@@ -100,9 +124,12 @@ while True:
     server_data['connection_list'].append(conn)
     print(f"{conn}, {address} is connected")
 
-    info = get_current_information(server_data)
-    sendMessage(info,conn)
+    get_current_information(server_data, conn)
 
+    while (server_data['waiting']):
+        continue
+
+    print("Here now")
     thread = threading.Thread(target=handle_client, args=(conn,address,server_data))
     thread.start()
 
