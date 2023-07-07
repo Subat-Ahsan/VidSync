@@ -50,16 +50,16 @@ def swap(value):
         return True
     return False
 
-def sendMessage(message,socket):
+def send_message(message,socket):
     try:
         socket.send((message+" "*(MAX_SIZE - len(message))).encode(FORMAT))
     except ConnectionResetError:
         print("Connection Reset Error")
         return
 
-def sendCommand(command,argument,socket):
+def send_command(command,argument,socket):
     s = command+","+argument+"#"
-    sendMessage(s,socket)
+    send_message(s,socket)
 
 def get_track(message):
     x = input(message)
@@ -69,28 +69,36 @@ def get_track(message):
 
 def play_file(player, socket):
     while True:
-        fn = input("Enter filename (q to quit): ")
+        fn = input("Enter filename (q to quit or w to wait): ")
         if (fn == 'q'):
-            sendMessage(DC+"#",socket)
+            if player.playing == True:
+                return
+            send_message(DC+"#",socket)
             exit()
+
+        elif (fn == 'w'):
+            return 'w'
+
         if (not (os.path.exists(f"./{DIR}/{fn}"))):
             print("File not found")
             continue
+
         fileType=fn.split(".")[-1]
         if ( fileType not in {'mp4', 'mkv', 'mp3'}):
             print("Invalid type")
             continue
+
         break
 
-    sendCommand("sfn",fn,socket)
-    sendCommand("pw","0",socket)
+    send_command("sfn",fn,socket)
+    send_command("pw","0",socket)
     
     audioTrack=1
     VideoTrack=1
-
+    time.sleep(0.5)
     count = 0
     if (fileType=="mkv"):
-        time.sleep(0.5)
+        
         print("\nAudio Tracks:")
 
         for i in player.get_media().track_list:
@@ -105,6 +113,7 @@ def play_file(player, socket):
         
         count = 0
         print("\nSub Tracks:")
+
         for i in player.get_media().track_list:
             if (i['type'] == 'sub'):
                 if ('title' in i.keys()):
@@ -114,12 +123,11 @@ def play_file(player, socket):
             count += 1
         subTrack = get_track("Enter subtitle track: ")
         
-        sendCommand("aid",audioTrack,socket)
-        sendCommand("sid",subTrack,socket)
+        send_command("aid",audioTrack,socket)
+        send_command("sid",subTrack,socket)
         
         print("Hit play")
     else:
         pass
 
-if __name__ == '__main__':
-    print(format_time(233))
+

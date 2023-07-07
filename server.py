@@ -17,8 +17,11 @@ server_data = {
 }
 
 def disconnect(message, server_data, conn):
-    print(message,conn)
-    server_data["connection_list"].remove(conn)
+    try:
+        server_data["connection_list"].remove(conn)
+    except:
+        pass
+
     if conn == server_data['main_conn']:
         if len(server_data["connection_list"]) == 0:
             server_data['main_conn'] = None
@@ -27,20 +30,20 @@ def disconnect(message, server_data, conn):
     
 def get_current_information(server_data, conn):
     if server_data['main_conn'] == None:
-        sendMessage("NONE#", conn)
+        send_message("NONE#", conn)
         return
 
     for c in server_data["connection_list"]:
         if c == conn:
             continue
-        sendCommand("n","0",c)
+        send_command("n","0",c)
         server_data['waiting'] = True
         server_data['new_conn'] = conn
-    sendMessage("i#",server_data['main_conn'])
+    send_message(GET_INFORMATION+PERIOD,server_data['main_conn'])
 
 def stop_waiting_for_new_conn(server_data):
     for i in server_data["connection_list"]:
-        sendMessage("c,0#",i)
+        send_message(CONTINUE+",0"+PERIOD,i)
     server_data["new_conn"] = None
     server_data["waiting"] = False
 
@@ -61,8 +64,8 @@ def handle_client(conn,address,server_data):
             break
 
         message_decoded = message.decode(FORMAT)
-        message_split = message_decoded.split("#")[0]
-        print(f"From: {conn} : {message_split}|")
+        message_split = message_decoded.split(PERIOD)[0]
+        #print(f"From: {conn} : {message_split}|")
 
         if message_split == DC:
             disconnect("Disconnecting (q)",server_data,conn)
@@ -79,16 +82,16 @@ def handle_client(conn,address,server_data):
             print("Done")
             os._exit(1)
 
-        if message_split[0] == '>':
+        if message_split[0] == SEND_TO_NEW:
             
-            sendMessage(message_split[1:],server_data["new_conn"])
+            send_message(message_split[1:],server_data["new_conn"])
             try:
                 m = server_data["new_conn"].recv(MAX_SIZE)
             except:
                 stop_waiting_for_new_conn(server_data)
                 disconnect("Disconnecting (n)", server_data, server_data["new_conn"])
                 continue
-            print(m)
+
             stop_waiting_for_new_conn(server_data)
             
             if message == '':
@@ -96,7 +99,7 @@ def handle_client(conn,address,server_data):
             continue
         
 
-        if message_split == "pw,0":
+        if message_split[:2] == PLAY_WAIT:
             server_data["main_conn"] = conn
 
         for i in server_data["connection_list"]:
@@ -129,7 +132,6 @@ while True:
     while (server_data['waiting']):
         continue
 
-    print("Here now")
     thread = threading.Thread(target=handle_client, args=(conn,address,server_data))
     thread.start()
 
