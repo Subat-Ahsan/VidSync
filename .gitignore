@@ -2,8 +2,7 @@
 /env
 /__pycache__
 notes.txt
-t4.py
-t3.py
-t2.py
-t1.py
-local_server.py
+lib/mpv.py
+lib/__pycache__
+conn_data.py
+/lib/mpv-1.0.3.dist-info

@@ -1,15 +1,17 @@
 #!/usr/bin/env python3
 import time
-import mpv
 import os
-import pymkv
+
+os.environ["PATH"] = os.path.dirname(__file__) +'\lib' + os.pathsep + os.environ["PATH"]
+from lib import mpv
 
 import socket
 import threading 
 
 from Constants import *
 from helper import *
-from local_server import *
+from conn_data import *
+
 
 class Player():
     media_player= mpv.MPV(fs=False, keep_open=True)

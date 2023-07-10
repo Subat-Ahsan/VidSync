@@ -1,13 +1,13 @@
 import socket
 import threading 
 from Constants import *
-from local_server import *
+from conn_data import *
 from helper import *
 import time
 import os
 
 server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-server.bind((HOST,PORT))
+server.bind((LOCAL_HOST,PORT))
 
 server_data = {
     "connection_list" : [],
