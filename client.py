@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 import time
 import os
 
@@ -37,18 +36,36 @@ class Player():
 
     @media_player.on_key_press('RIGHT')
     def my_RIGHT_binding():
-        send_command(RIGHT_SEEK, str(SEEK_VALUE) ,socket)
+        send_command(SEEK, str(SEEK_VALUE) ,socket)
 
     @media_player.on_key_press('LEFT')
     def my_LEFT_binding():
-        send_command(LEFT_SEEK, str(SEEK_VALUE) ,socket)
+        send_command(SEEK, str(SEEK_VALUE * -1) ,socket)
 
+    @media_player.on_key_press('a')
+    def my_a_binding():
+        x = get_time("Enter amount (-1 to quit):")
+        if (x < 0 ):
+            return
+        send_command(SKIP, str(x*-1) ,socket)
+
+    @media_player.on_key_press('d')
+    def my_d_binding():
+        x = get_time("Enter amount (-1 to quit):")
+        if (x < 0 ):
+            return
+        send_command(SKIP, str(x) ,socket)
+    
     @media_player.on_key_press('g')
     def my_g_binding():
         x = get_time("Enter position (-1 to quit):")
         if (x < 0 ):
             return
         send_command("g", str(x) ,socket)
+
+    @media_player.on_key_press('r')
+    def my_r_binding():
+        send_command("g", str(player.get_property('time_pos')) ,socket)
 
     def play(self):
         self.media_player.play(f'./{self.DIR}/{self.fn}')
@@ -107,7 +124,6 @@ class Player():
         fn = info_lis[0]
 
         time_pos = float(info_lis[1])
-        duration = float(info_lis[2])
         aid = int(info_lis[3])
         sid = int(info_lis[4])
         pause = bool(int(info_lis[5]))
@@ -156,11 +172,11 @@ def handleMessage(player):
             else:
                 player.pause(True)
         
-        elif (c == RIGHT_SEEK):
+        elif (c == SEEK):
             player.seek(int(a))
 
-        elif (c == LEFT_SEEK):
-            player.seek(int(a) * -1)
+        elif (c== SKIP):
+            player.seek(int(a), r="relative", p="exact")
 
         elif (c == FIND):
             player.seek(int(a),  r="absolute" , p="exact")
@@ -185,7 +201,7 @@ socket = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
 socket.connect((HOST,PORT))
 info = socket.recv(MAX_SIZE).decode(FORMAT)
 
-print("Socket 1:" + str(socket))
+print(f"Connected to: {socket.getpeername()}")
     
 input_thread = threading.Thread(target=handleMessage,args=(player,) )
 input_thread.daemon = True

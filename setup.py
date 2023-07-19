@@ -10,6 +10,7 @@ if not os.path.isdir(DIR):
 if not os.path.isfile('./lib/mpv.py'):
     os.system(f"pip install mpv -t ./lib --upgrade")
 
+os.system("pip install requests --upgrade")
 
 host = input("Server's address (for client): ")
 local_host = input("Host computer's address (for server): ")

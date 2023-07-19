@@ -1,10 +1,12 @@
 import socket
 import threading 
+import time
+import os
+import requests
+
 from Constants import *
 from conn_data import *
 from helper import *
-import time
-import os
 
 server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 server.bind((LOCAL_HOST,PORT))
@@ -16,7 +18,10 @@ server_data = {
     "waiting" : False
 }
 
+print(f"Server Running on \nIPv4: {LOCAL_HOST}\nPublic IpV4: {requests.get('https://checkip.amazonaws.com').text.strip()}\nPort: {PORT}\n")
+
 def disconnect(message, server_data, conn):
+    print("\n"+message+":",conn)
     try:
         server_data["connection_list"].remove(conn)
     except:
@@ -65,7 +70,6 @@ def handle_client(conn,address,server_data):
 
         message_decoded = message.decode(FORMAT)
         message_split = message_decoded.split(PERIOD)[0]
-        #print(f"From: {conn} : {message_split}|")
 
         if message_split == DC:
             disconnect("Disconnecting (q)",server_data,conn)
@@ -79,7 +83,7 @@ def handle_client(conn,address,server_data):
             for i in server_data["connection_list"]:
                 i.close()
 
-            print("Done")
+            print("\nDone")
             os._exit(1)
 
         if message_split[0] == SEND_TO_NEW:
@@ -109,14 +113,18 @@ def handle_client(conn,address,server_data):
 
 def info(server_data):
     while True:
-        x = input()
+        try:
+            x = input('Press enter for server data: ')
+        except:
+            continue   
         print(f"Connection List: {server_data['connection_list']}")
         print(f"Main: {server_data['main_conn']}")
-        print(threading.enumerate())
+        print(threading.enumerate(),'\n')
+        
 
-t = threading.Thread(target=info, args=(server_data,))
-t.daemon = True
-t.start()
+info_thread = threading.Thread(target=info, args=(server_data,))
+info_thread.daemon = True
+info_thread.start()
 
 while True:
     server.listen()
@@ -125,7 +133,7 @@ while True:
         continue
     
     server_data['connection_list'].append(conn)
-    print(f"{conn}, {address} is connected")
+    print(f"\n{conn} is connected")
 
     get_current_information(server_data, conn)
 
